@@ -1,61 +1,63 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "example-app.fullname" . }}
+  name: "{{.Values.name}}"
   labels:
-    {{- include "example-app.labels" . | nindent 4 }}
+    app: "{{.Values.name}}"
+    test: test
+  annotations:
+    fluxcd.io/tag.example-app: semver:~1.0
+    fluxcd.io/automated: 'true'
 spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
-  {{- end }}
   selector:
     matchLabels:
-      {{- include "example-app.selectorLabels" . | nindent 6 }}
+      app: "{{.Values.name}}"
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       labels:
-        {{- include "example-app.selectorLabels" . | nindent 8 }}
+        app: "{{.Values.name}}"
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "example-app.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: {{ .Values.service.port }}
-              protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
+      - name: "{{.Values.name}}"
+        image: {{.Values.deployment.image}}:{{.Values.deployment.tag}}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+        # livenessProbe:
+        #   httpGet:
+        #     path: /status
+        #     port: 5000
+        #   initialDelaySeconds: 3
+        #   periodSeconds: 3
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
       tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      - key: "cattle.io/os"
+        value: "linux"
+        effect: "NoSchedule"      
+#NOTE: comment out `volumeMounts` section for configmap and\or secret guide
+        # volumeMounts:
+        # - name: secret-volume
+        #   mountPath: /secrets/
+        # - name: config-volume
+        #   mountPath: /configs/
+#NOTE: comment out `volumes` section for configmap and\or secret guide
+      # volumes:
+      # - name: secret-volume
+      #   secret:
+      #     secretName: mysecret
+      # - name: config-volume
+      #   configMap:
+      #     name: example-config #name of our configmap object
